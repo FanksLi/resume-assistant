@@ -30,10 +30,13 @@
 - `DEEPSEEK_API_KEY` - 如果使用 DeepSeek API
 - `QWEN_API_KEY` - 如果使用通义千问 API
 - `SKIP_DB_MIGRATE` - 设置为 "true" 以跳过数据库迁移（解决部署错误）
+- `NPM_LEGACY_PEER_DEPS` - 设置为 "true" 以解决 npm 依赖冲突问题（特别是当遇到 OpenTelemetry 包版本冲突时）
 
 在 Vercel 项目页面中：
 1. 进入 Settings > Environment Variables
 2. 添加上述需要的环境变量
+3. 对于敏感变量（如 API 密钥），建议标记为 "Production" 环境变量
+4. 点击 "Save" 保存配置
 
 ### 4. 自定义域名（可选）
 
