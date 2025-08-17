@@ -96,16 +96,45 @@ Error: POSTGRES_URL is not defined
     at runMigrate (/vercel/path0/lib/db/migrate.ts:12:11)
 ```
 
-这是由于某些依赖包在构建时尝试运行数据库迁移脚本，但缺少必要的环境变量。解决方法如下：
+或者：
+```
+TypeError: Invalid URL
+    at new URL (node:internal/url:825:25)
+```
 
-1. 在 Vercel 环境变量中添加：
+这是由于某些依赖包在构建时尝试运行数据库迁移脚本，但项目本身并不使用数据库。解决方法如下：
+
+1. 项目中已添加了数据库模拟文件以防止构建错误：
+   - [lib/db/migrate.ts](file://e:\studySpace\ai\resume-assistant\lib\db\migrate.ts) - 空的迁移实现
+   - [lib/db/index.ts](file://e:\studySpace\ai\resume-assistant\lib\db\index.ts) - 空的数据库连接实现
+
+2. 在 Vercel 环境变量中添加：
    - `SKIP_DB_MIGRATE` = `true`
 
-2. 项目中已添加以下配置文件来辅助解决此问题：
-   - [.npmrc](file://e:\studySpace\ai\resume-assistant\.npmrc) - 包含 SKIP_DB_MIGRATE=true 配置
-   - [pnpm-workspace.yaml](file://e:\studySpace\ai\resume-assistant\pnpm-workspace.yaml) - pnpm 工作区配置
+这些文件提供了空实现，防止构建过程中出现数据库相关错误。
 
-这些配置文件可以帮助在构建过程中跳过数据库迁移步骤，解决部署问题。
+### 依赖冲突错误
+
+如果遇到如下错误：
+```
+npm error ERESOLVE unable to resolve dependency tree
+npm error While resolving: ai-chatbot@3.1.0
+npm error Found: @opentelemetry/api-logs@0.200.0
+...
+npm error peer @opentelemetry/api-logs@">=0.46.0 <0.200.0" from @vercel/otel@1.13.0
+```
+
+这是由于不同版本的 OpenTelemetry 包之间的兼容性问题导致的。解决方法如下：
+
+1. 项目中已添加了 [.npmrc](file://e:\studySpace\ai\resume-assistant\.npmrc) 配置文件，包含 `legacy-peer-deps=true` 设置
+2. 这将告诉 npm 使用旧版本的依赖解析算法，忽略 peer dependencies 冲突
+
+### Vercel 构建超时
+
+如果构建过程超时，请尝试以下方法：
+1. 检查是否在构建过程中执行了不必要的任务
+2. 确保所有外部依赖都已正确配置
+3. 考虑优化构建过程，移除不必要的步骤
 
 ## 支持的 Node.js 版本
 

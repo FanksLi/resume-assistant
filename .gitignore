@@ -62,7 +62,3 @@ sessions.json
 
 # Local development files
 *.local
-
-# Package manager configs
-.npmrc
-pnpm-workspace.yaml
