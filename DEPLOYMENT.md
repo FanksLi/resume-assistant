@@ -109,7 +109,20 @@ TypeError: Invalid URL
    - [lib/db/index.ts](file://e:\studySpace\ai\resume-assistant\lib\db\index.ts) - 空的数据库连接实现
 
 2. 在 Vercel 环境变量中添加：
-   - `SKIP_DB_MIGRATE` = `true`
+   ```
+   SKIP_DB_MIGRATE=true
+   ```
+
+3. 构建脚本已更新为包含 SKIP_DB_MIGRATE 环境变量：
+   ```json
+   "build": "SKIP_DB_MIGRATE=true next build"
+   ```
+
+如果仍有问题，请确保以下文件存在于项目中：
+- `lib/db/migrate.ts` - 数据库迁移模拟文件
+- `lib/db/index.ts` - 数据库连接模拟文件
+
+这些文件会拦截所有数据库相关操作，防止构建过程中出现数据库连接错误。
 
 这些文件提供了空实现，防止构建过程中出现数据库相关错误。
 
