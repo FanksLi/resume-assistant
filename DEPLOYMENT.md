@@ -29,6 +29,7 @@
 - `OPENAI_API_KEY` - 您的 OpenAI API 密钥（必须）
 - `DEEPSEEK_API_KEY` - 如果使用 DeepSeek API
 - `QWEN_API_KEY` - 如果使用通义千问 API
+- `SKIP_DB_MIGRATE` - 设置为 "true" 以跳过数据库迁移（解决部署错误）
 
 在 Vercel 项目页面中：
 1. 进入 Settings > Environment Variables
@@ -86,6 +87,25 @@ Vercel 对 Serverless Functions 有一些限制：
 1. 环境变量是否正确配置
 2. API 密钥是否有效
 3. 日志中是否有内存不足或超时错误
+
+### 数据库迁移错误
+
+如果遇到如下错误：
+```
+Error: POSTGRES_URL is not defined
+    at runMigrate (/vercel/path0/lib/db/migrate.ts:12:11)
+```
+
+这是由于某些依赖包在构建时尝试运行数据库迁移脚本，但缺少必要的环境变量。解决方法如下：
+
+1. 在 Vercel 环境变量中添加：
+   - `SKIP_DB_MIGRATE` = `true`
+
+2. 项目中已添加以下配置文件来辅助解决此问题：
+   - [.npmrc](file://e:\studySpace\ai\resume-assistant\.npmrc) - 包含 SKIP_DB_MIGRATE=true 配置
+   - [pnpm-workspace.yaml](file://e:\studySpace\ai\resume-assistant\pnpm-workspace.yaml) - pnpm 工作区配置
+
+这些配置文件可以帮助在构建过程中跳过数据库迁移步骤，解决部署问题。
 
 ## 支持的 Node.js 版本
 
