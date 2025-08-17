@@ -134,16 +134,41 @@ TypeError: Invalid URL
 如果遇到如下错误：
 ```
 npm error ERESOLVE unable to resolve dependency tree
-npm error While resolving: ai-chatbot@3.1.0
-npm error Found: @opentelemetry/api-logs@0.200.0
-...
-npm error peer @opentelemetry/api-logs@">=0.46.0 <0.200.0" from @vercel/otel@1.13.0
 ```
 
-这是由于不同版本的 OpenTelemetry 包之间的兼容性问题导致的。解决方法如下：
+或者：
+```
+npm error While resolving: @langchain/community@0.3.50
+npm error Found: openai@5.12.2
+...
+npm error Conflicting peer dependency: openai@4.104.0
+```
 
-1. 项目中已添加了 [.npmrc](file://e:\studySpace\ai\resume-assistant\.npmrc) 配置文件，包含 `legacy-peer-deps=true` 设置
-2. 这将告诉 npm 使用旧版本的依赖解析算法，忽略 peer dependencies 冲突
+这是由于 npm 的依赖解析算法在处理 peer dependencies（对等依赖）时发现版本冲突导致的。解决方法如下：
+
+1. 项目中已添加 `.npmrc` 文件：
+   ```
+   # Skip database migration during install
+   SKIP_DB_MIGRATE=true
+
+   # 解决 npm 依赖冲突问题
+   legacy-peer-deps=true
+   auto-install-peers=true
+   ```
+
+2. 在 Vercel 控制台的 Environment Variables（环境变量）设置中添加：
+   ```
+   NPM_LEGACY_PEER_DEPS=true
+   ```
+
+3. 或者在 Vercel 控制台的 Environment Variables（环境变量）设置中添加：
+   ```
+   SKIP_DB_MIGRATE=true
+   ```
+
+注意：Vercel 构建配置不支持在 vercel.json 中直接指定 installCommand，必须通过环境变量或配置文件方式解决依赖冲突问题。
+
+对于 @langchain/community 的特定依赖冲突，我们通过在 .npmrc 中添加 `auto-install-peers=true` 来解决 peer dependencies 的自动安装问题。
 
 ### Vercel 构建超时
 
@@ -162,4 +187,3 @@ Vercel 支持最新的 Node.js 版本。确保您的 package.json 中的 engines
     "node": ">=18.x"
   }
 }
-```

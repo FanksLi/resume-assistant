@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "SKIP_DB_MIGRATE=true next build",
     "start": "next start",
     "lint": "next lint"
   },
@@ -15,7 +15,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@langchain/community": "^0.3.27",
+    "@langchain/community": "0.3.27",
     "@langchain/core": "^0.3.69",
     "@langchain/openai": "^0.6.7",
     "@tailwindcss/typography": "^0.5.16",
