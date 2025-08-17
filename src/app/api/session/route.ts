@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { existsSync } from 'fs';
 import { readFile, writeFile, unlink } from 'fs/promises';
 import path from 'path';
-import { readSessionsFromFile, writeSessionsToFile } from '../upload/route';
+import { readSessionsFromFile, writeSessionsToFile } from '@/app/lib/sessionManager';
 
 export async function DELETE(request: Request) {
   try {
@@ -53,9 +53,22 @@ export async function DELETE(request: Request) {
       { status: 200 }
     );
   } catch (error: any) {
-    console.error('会话清除错误:', error);
+    console.error('清除会话失败:', error);
     return NextResponse.json(
-      { message: `会话清除失败: ${error.message || '未知错误'}` },
+      { message: `清除会话失败: ${error.message || '未知错误'}` },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET() {
+  try {
+    const sessions = await readSessionsFromFile();
+    return NextResponse.json({ sessions }, { status: 200 });
+  } catch (error: any) {
+    console.error('获取会话失败:', error);
+    return NextResponse.json(
+      { message: `获取会话失败: ${error.message || '未知错误'}` },
       { status: 500 }
     );
   }

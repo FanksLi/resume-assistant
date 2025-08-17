@@ -4,35 +4,7 @@ import { existsSync } from 'fs';
 import path from 'path';
 import { parseDocument } from '@/app/lib/documentProcessor';
 import { splitText } from '@/app/lib/textSplitter';
-// import { createVectorStore } from '@/app/lib/vectorStore';
-
-// 会话文件路径
-const getSessionFilePath = () => path.join(process.cwd(), 'sessions.json');
-
-// 读取会话数据
-const readSessionsFromFile = async () => {
-  try {
-    const sessionFile = getSessionFilePath();
-    if (existsSync(sessionFile)) {
-      const data = await readFile(sessionFile, 'utf8');
-      return JSON.parse(data);
-    }
-    return {};
-  } catch (error) {
-    console.error('读取会话文件失败:', error);
-    return {};
-  }
-};
-
-// 写入会话数据
-const writeSessionsToFile = async (sessions: any) => {
-  try {
-    const sessionFile = getSessionFilePath();
-    await writeFile(sessionFile, JSON.stringify(sessions, null, 2));
-  } catch (error) {
-    console.error('写入会话文件失败:', error);
-  }
-};
+import { readSessionsFromFile, writeSessionsToFile } from '@/app/lib/sessionManager';
 
 export async function POST(request: Request) {
   try {
@@ -138,6 +110,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
-// 导出辅助函数供其他API使用
-export { readSessionsFromFile, writeSessionsToFile };

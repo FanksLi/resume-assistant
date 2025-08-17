@@ -22,6 +22,7 @@
     "langchain": "^0.3.30",
     "mammoth": "^1.10.0",
     "next": "latest",
+    "openai": "^5.12.2",
     "pdf-parse": "^1.1.1",
     "react": "latest",
     "react-dom": "latest",
@@ -29,6 +30,7 @@
   },
   "devDependencies": {
     "@types/node": "latest",
+    "@types/pdf-parse": "^1.1.5",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "autoprefixer": "^10.4.21",

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { existsSync } from 'fs';
 import { readFile, readdir, unlink, stat } from 'fs/promises';
 import path from 'path';
-import { readSessionsFromFile, writeSessionsToFile } from '../upload/route';
+import { readSessionsFromFile, writeSessionsToFile } from '@/app/lib/sessionManager';
 import { parseDocument } from '@/app/lib/documentProcessor';
 
 // 定义会话数据类型

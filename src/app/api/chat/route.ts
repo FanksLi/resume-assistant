@@ -8,7 +8,7 @@ import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import path from 'path';
 import { createVectorStore } from '@/app/lib/vectorStore';
-import { readSessionsFromFile } from '../upload/route';
+import { readSessionsFromFile } from '@/app/lib/sessionManager';
 
 export async function POST(request: Request) {
   try {
