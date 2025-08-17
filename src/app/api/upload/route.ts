@@ -8,10 +8,13 @@ import { readSessionsFromFile, writeSessionsToFile } from '@/app/lib/sessionMana
 
 export async function POST(request: Request) {
   try {
-    // 确保uploads目录存在
-    const uploadDir = path.join(process.cwd(), 'uploads');
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
+    // 在 Vercel 环境中，我们不将文件保存到磁盘，而是直接处理文件内容
+    // 仅在非生产环境中创建 uploads 目录用于本地开发
+    if (process.env.NODE_ENV !== 'production') {
+      const uploadDir = path.join(process.cwd(), 'uploads');
+      if (!existsSync(uploadDir)) {
+        await mkdir(uploadDir, { recursive: true });
+      }
     }
 
     // 确保vectorization目录存在
@@ -47,17 +50,27 @@ export async function POST(request: Request) {
       );
     }
 
-    // 保存文件到uploads目录
+    // 直接处理文件内容，不保存到磁盘
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     
-    const filename = `${Date.now()}-${file.name}`;
-    const filepath = path.join(uploadDir, filename);
-    
-    await writeFile(filepath, buffer);
+    // 为本地开发环境保存文件
+    let filepath = '';
+    if (process.env.NODE_ENV !== 'production') {
+      const filename = `${Date.now()}-${file.name}`;
+      filepath = path.join(process.cwd(), 'uploads', filename);
+      await writeFile(filepath, buffer);
+    }
 
     // 解析文档内容
-    const text = await parseDocument(filepath, file.type);
+    let text = '';
+    if (process.env.NODE_ENV === 'production') {
+      // 在生产环境中直接处理 buffer
+      text = await parseDocument(buffer, file.type);
+    } else {
+      // 在开发环境中处理文件路径
+      text = await parseDocument(filepath, file.type);
+    }
     
     // 文本分片
     const texts = await splitText(text, 1000, 200);
@@ -103,9 +116,9 @@ export async function POST(request: Request) {
       { status: 200 }
     );
   } catch (error: any) {
-    console.error('文件处理错误:', error);
+    console.error('简历处理错误:', error);
     return NextResponse.json(
-      { message: `文件处理失败: ${error.message || '未知错误'}` },
+      { message: '简历处理失败', error: error.message || '未知错误' },
       { status: 500 }
     );
   }

@@ -181,9 +181,68 @@ npm error Conflicting peer dependency: openai@4.104.0
 
 Vercel 支持最新的 Node.js 版本。确保您的 package.json 中的 engines 字段与 Vercel 支持的版本兼容：
 
-```json
+```
 {
   "engines": {
     "node": ">=18.x"
   }
 }
+```
+
+## Vercel 部署配置
+
+### 环境变量配置
+- 使用`NPM_LEGACY_PEER_DEPS=true`环境变量来解决npm依赖冲突问题
+- 使用`SKIP_DB_MIGRATE=true`环境变量跳过数据库迁移步骤
+- 所有环境变量都应该在Vercel控制台的Environment Variables设置中配置
+
+### 文件处理注意事项
+
+由于 Vercel 的无服务器环境限制，文件系统是只读的（除了 `/tmp` 目录）。为了解决这个问题：
+
+1. 应用程序已修改为在生产环境中直接处理文件 buffer，而不是将文件保存到磁盘
+2. 仅在本地开发环境中将文件保存到 [uploads](file:///e:/studySpace/ai/resume-assistant/uploads/) 目录
+3. 所有向量化数据仍然保存到 `vectorization` 目录中，该目录在项目根目录下
+
+这种修改确保了应用程序在 Vercel 环境中能够正常工作，同时保持了本地开发的便利性。
+
+## 依赖冲突错误
+
+如果遇到如下错误：
+```
+npm error ERESOLVE unable to resolve dependency tree
+```
+
+或者：
+```
+npm error While resolving: @langchain/community@0.3.50
+npm error Found: openai@5.12.2
+...
+npm error Conflicting peer dependency: openai@4.104.0
+```
+
+这是由于 npm 的依赖解析算法在处理 peer dependencies（对等依赖）时发现版本冲突导致的。解决方法如下：
+
+1. 项目中已添加 `.npmrc` 文件：
+   ```
+   # Skip database migration during install
+   SKIP_DB_MIGRATE=true
+
+   # 解决 npm 依赖冲突问题
+   legacy-peer-deps=true
+   auto-install-peers=true
+   ```
+
+2. 在 Vercel 控制台的 Environment Variables（环境变量）设置中添加：
+   ```
+   NPM_LEGACY_PEER_DEPS=true
+   ```
+
+3. 或者在 Vercel 控制台的 Environment Variables（环境变量）设置中添加：
+   ```
+   SKIP_DB_MIGRATE=true
+   ```
+
+注意：Vercel 构建配置不支持在 vercel.json 中直接指定 installCommand，必须通过环境变量或配置文件方式解决依赖冲突问题。
+
+对于 @langchain/community 的特定依赖冲突，我们通过在 .npmrc 中添加 `auto-install-peers=true` 来解决 peer dependencies 的自动安装问题。
