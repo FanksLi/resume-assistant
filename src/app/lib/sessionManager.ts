@@ -2,8 +2,8 @@ import { writeFile, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 
-// 会话文件路径
-const getSessionFilePath = () => path.join(process.cwd(), 'sessions.json');
+// 会话文件路径 - 使用 /tmp 目录确保在 Vercel 环境中可写
+const getSessionFilePath = () => path.join('/tmp', 'sessions.json');
 
 /**
  * 从文件中读取会话数据

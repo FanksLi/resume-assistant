@@ -8,18 +8,16 @@ import { readSessionsFromFile, writeSessionsToFile } from '@/app/lib/sessionMana
 
 export async function POST(request: Request) {
   try {
-    // 在 Vercel 环境中，我们不将文件保存到磁盘，而是直接处理文件内容
-    // 仅在非生产环境中创建 uploads 目录用于本地开发
-    if (process.env.NODE_ENV !== 'production') {
-      const uploadDir = path.join(process.cwd(), 'uploads');
-      if (!existsSync(uploadDir)) {
-        await mkdir(uploadDir, { recursive: true });
-      }
+    // 使用 /tmp 目录进行文件存储（Vercel 环境中唯一可写的目录）
+    const uploadDir = path.join('/tmp', 'uploads');
+    const vectorizationDir = path.join('/tmp', 'vectorization');
+    
+    // 确保 /tmp 目录中的子目录存在
+    if (!existsSync(uploadDir)) {
+      await mkdir(uploadDir, { recursive: true });
     }
-
-    // 确保vectorization目录存在，仅在非生产环境中创建
-    const vectorizationDir = path.join(process.cwd(), 'vectorization');
-    if (process.env.NODE_ENV !== 'production' && !existsSync(vectorizationDir)) {
+    
+    if (!existsSync(vectorizationDir)) {
       await mkdir(vectorizationDir, { recursive: true });
     }
 
@@ -50,27 +48,18 @@ export async function POST(request: Request) {
       );
     }
 
-    // 直接处理文件内容，不保存到磁盘
+    // 处理文件内容并保存到 /tmp/uploads 目录
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     
-    // 为本地开发环境保存文件
-    let filepath = '';
-    if (process.env.NODE_ENV !== 'production') {
-      const filename = `${Date.now()}-${file.name}`;
-      filepath = path.join(process.cwd(), 'uploads', filename);
-      await writeFile(filepath, buffer);
-    }
+    const filename = `${Date.now()}-${file.name}`;
+    const filepath = path.join(uploadDir, filename);
+    await writeFile(filepath, buffer);
 
     // 解析文档内容
     let text = '';
-    if (process.env.NODE_ENV === 'production') {
-      // 在生产环境中直接处理 buffer
-      text = await parseDocument(buffer, file.type);
-    } else {
-      // 在开发环境中处理文件路径
-      text = await parseDocument(filepath, file.type);
-    }
+    // 在所有环境中都处理文件路径
+    text = await parseDocument(filepath, file.type);
     
     // 文本分片
     const texts = await splitText(text, 1000, 200);
@@ -93,21 +82,19 @@ export async function POST(request: Request) {
     // 写入会话数据到文件
     await writeSessionsToFile(sessions);
 
-    // 将向量化数据存储到vectorization目录，仅在非生产环境中执行
-    if (process.env.NODE_ENV !== 'production') {
-      const vectorData = {
-        sessionId,
-        filename: file.name,
-        originalText: text, // 保存解析后的纯文本，而不是原始二进制内容
-        chunks: texts,
-        createdAt: new Date().toISOString()
-      };
-      
-      // 使用格式: {sessionId}.json 以便于会话恢复
-      const vectorFilename = `${sessionId}.json`;
-      const vectorFilePath = path.join(vectorizationDir, vectorFilename);
-      await writeFile(vectorFilePath, JSON.stringify(vectorData, null, 2));
-    }
+    // 将向量化数据存储到 /tmp/vectorization 目录
+    const vectorData = {
+      sessionId,
+      filename: file.name,
+      originalText: text, // 保存解析后的纯文本，而不是原始二进制内容
+      chunks: texts,
+      createdAt: new Date().toISOString()
+    };
+    
+    // 使用格式: {sessionId}.json 以便于会话恢复
+    const vectorFilename = `${sessionId}.json`;
+    const vectorFilePath = path.join(vectorizationDir, vectorFilename);
+    await writeFile(vectorFilePath, JSON.stringify(vectorData, null, 2));
 
     return NextResponse.json(
       { 

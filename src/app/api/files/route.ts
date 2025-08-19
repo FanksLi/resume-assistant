@@ -27,7 +27,7 @@ export async function GET(request: Request) {
   // 如果是预览请求
   if (previewFile) {
     try {
-      const uploadDir = path.join(process.cwd(), 'uploads');
+      const uploadDir = path.join('/tmp', 'uploads');
       
       // 查找匹配的文件（文件名可能包含时间戳前缀）
       const uploadedFiles = await readdir(uploadDir);
@@ -100,11 +100,20 @@ export async function GET(request: Request) {
   
   // 原有的文件列表逻辑
   try {
-    const uploadDir = path.join(process.cwd(), 'uploads');
-    const vectorizationDir = path.join(process.cwd(), 'vectorization');
+    const uploadDir = path.join('/tmp', 'uploads');
+    const vectorizationDir = path.join('/tmp', 'vectorization');
     
     // 检查目录是否存在
     if (!existsSync(uploadDir) || !existsSync(vectorizationDir)) {
+      // 如果目录不存在，创建它们
+      if (!existsSync(uploadDir)) {
+        await mkdir(uploadDir, { recursive: true });
+      }
+      
+      if (!existsSync(vectorizationDir)) {
+        await mkdir(vectorizationDir, { recursive: true });
+      }
+      
       return NextResponse.json({ files: [] }, { status: 200 });
     }
 
@@ -197,7 +206,7 @@ export async function POST(request: Request) {
       );
     }
     
-    const vectorizationDir = path.join(process.cwd(), 'vectorization');
+    const vectorizationDir = path.join('/tmp', 'vectorization');
     
     // 检查目录是否存在
     if (!existsSync(vectorizationDir)) {
@@ -278,18 +287,16 @@ export async function POST(request: Request) {
 // 更新文件
 export async function PUT(request: Request) {
   try {
-    // 在 Vercel 环境中，我们不将文件保存到磁盘，而是直接处理文件内容
-    // 仅在非生产环境中创建 uploads 目录用于本地开发
-    if (process.env.NODE_ENV !== 'production') {
-      const uploadDir = path.join(process.cwd(), 'uploads');
-      if (!existsSync(uploadDir)) {
-        await mkdir(uploadDir, { recursive: true });
-      }
+    // 使用 /tmp 目录进行文件存储（Vercel 环境中唯一可写的目录）
+    const uploadDir = path.join('/tmp', 'uploads');
+    const vectorizationDir = path.join('/tmp', 'vectorization');
+    
+    // 确保 /tmp 目录中的子目录存在
+    if (!existsSync(uploadDir)) {
+      await mkdir(uploadDir, { recursive: true });
     }
-
-    // 确保vectorization目录存在，仅在非生产环境中创建
-    const vectorizationDir = path.join(process.cwd(), 'vectorization');
-    if (process.env.NODE_ENV !== 'production' && !existsSync(vectorizationDir)) {
+    
+    if (!existsSync(vectorizationDir)) {
       await mkdir(vectorizationDir, { recursive: true });
     }
 
@@ -328,39 +335,29 @@ export async function PUT(request: Request) {
       );
     }
 
-    // 直接处理文件内容，不保存到磁盘
+    // 处理文件内容并保存到 /tmp/uploads 目录
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     
-    // 为本地开发环境保存文件，替换旧文件
-    let filepath = '';
-    if (process.env.NODE_ENV !== 'production') {
-      // 删除同名的旧文件
-      const uploadDir = path.join(process.cwd(), 'uploads');
-      const uploadedFiles = await readdir(uploadDir);
-      
-      for (const existingFile of uploadedFiles) {
-        const existingOriginalName = existingFile.replace(/^\d+-/, '');
-        if (existingOriginalName === originalFilename) {
-          const existingFilePath = path.join(uploadDir, existingFile);
-          await unlink(existingFilePath);
-        }
+    // 删除同名的旧文件
+    const uploadedFiles = await readdir(uploadDir);
+    
+    for (const existingFile of uploadedFiles) {
+      const existingOriginalName = existingFile.replace(/^\d+-/, '');
+      if (existingOriginalName === originalFilename) {
+        const existingFilePath = path.join(uploadDir, existingFile);
+        await unlink(existingFilePath);
       }
-      
-      const filename = `${Date.now()}-${file.name}`;
-      filepath = path.join(process.cwd(), 'uploads', filename);
-      await writeFile(filepath, buffer);
     }
+    
+    const filename = `${Date.now()}-${file.name}`;
+    const filepath = path.join(uploadDir, filename);
+    await writeFile(filepath, buffer);
 
     // 解析文档内容
     let text = '';
-    if (process.env.NODE_ENV === 'production') {
-      // 在生产环境中直接处理 buffer
-      text = await parseDocument(buffer, file.type);
-    } else {
-      // 在开发环境中处理文件路径
-      text = await parseDocument(filepath, file.type);
-    }
+    // 在所有环境中都处理文件路径
+    text = await parseDocument(filepath, file.type);
     
     // 文本分片
     const texts = await splitText(text, 1000, 200);
@@ -409,21 +406,19 @@ export async function PUT(request: Request) {
     // 写入会话数据到文件
     await writeSessionsToFile(sessions);
 
-    // 将向量化数据存储到vectorization目录，仅在非生产环境中执行
-    if (process.env.NODE_ENV !== 'production') {
-      const vectorData = {
-        sessionId,
-        filename: file.name,
-        originalText: text, // 保存解析后的纯文本，而不是原始二进制内容
-        chunks: texts,
-        createdAt: new Date().toISOString()
-      };
-      
-      // 使用格式: {sessionId}.json 以便于会话恢复
-      const vectorFilename = `${sessionId}.json`;
-      const vectorFilePath = path.join(vectorizationDir, vectorFilename);
-      await writeFile(vectorFilePath, JSON.stringify(vectorData, null, 2));
-    }
+    // 将向量化数据存储到 /tmp/vectorization 目录
+    const vectorData = {
+      sessionId,
+      filename: file.name,
+      originalText: text, // 保存解析后的纯文本，而不是原始二进制内容
+      chunks: texts,
+      createdAt: new Date().toISOString()
+    };
+    
+    // 使用格式: {sessionId}.json 以便于会话恢复
+    const vectorFilename = `${sessionId}.json`;
+    const vectorFilePath = path.join(vectorizationDir, vectorFilename);
+    await writeFile(vectorFilePath, JSON.stringify(vectorData, null, 2));
 
     return NextResponse.json(
       { 
@@ -473,7 +468,7 @@ export async function DELETE(request: Request) {
     }
 
     // 查找并删除对应的向量化文件
-    const vectorizationDir = path.join(process.cwd(), 'vectorization');
+    const vectorizationDir = path.join('/tmp', 'vectorization');
     const vectorFiles = await readdir(vectorizationDir);
     
     for (const vectorFile of vectorFiles) {
@@ -495,7 +490,7 @@ export async function DELETE(request: Request) {
     }
     
     // 删除上传目录中的文件
-    const uploadDir = path.join(process.cwd(), 'uploads');
+    const uploadDir = path.join('/tmp', 'uploads');
     const uploadedFiles = await readdir(uploadDir);
     
     // 查找并删除所有匹配的上传文件

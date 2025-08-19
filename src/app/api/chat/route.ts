@@ -33,13 +33,13 @@ export async function POST(request: Request) {
     // 检查会话是否存在
     let sessionData = null;
 
-    // 仅在非生产环境中从本地文件中读取会话数据
+    // 从本地文件中读取会话数据（现在所有环境都使用相同的方式）
     const sessions = await readSessionsFromFile();
     const sessionInfo = sessions[sessionId];
 
     if (sessionInfo) {
       // 如果会话存在，尝试从向量化文件中恢复向量存储
-      const vectorizationDir = path.join(process.cwd(), 'vectorization');
+      const vectorizationDir = path.join('/tmp', 'vectorization');
       if (existsSync(vectorizationDir)) {
         try {
           // 查找对应的向量化文件
