@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { existsSync } from 'fs';
-import { readFile, readdir, unlink, stat } from 'fs/promises';
+import { readFile, readdir, unlink, stat, writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { readSessionsFromFile, writeSessionsToFile } from '@/app/lib/sessionManager';
 import { parseDocument } from '@/app/lib/documentProcessor';
+import { splitText } from '@/app/lib/textSplitter';
 
 // 定义会话数据类型
 interface SessionData {
@@ -269,6 +270,173 @@ export async function POST(request: Request) {
     console.error('切换文件错误:', error);
     return NextResponse.json(
       { message: `切换文件失败: ${error.message || '未知错误'}` },
+      { status: 500 }
+    );
+  }
+}
+
+// 更新文件
+export async function PUT(request: Request) {
+  try {
+    // 在 Vercel 环境中，我们不将文件保存到磁盘，而是直接处理文件内容
+    // 仅在非生产环境中创建 uploads 目录用于本地开发
+    if (process.env.NODE_ENV !== 'production') {
+      const uploadDir = path.join(process.cwd(), 'uploads');
+      if (!existsSync(uploadDir)) {
+        await mkdir(uploadDir, { recursive: true });
+      }
+    }
+
+    // 确保vectorization目录存在，仅在非生产环境中创建
+    const vectorizationDir = path.join(process.cwd(), 'vectorization');
+    if (process.env.NODE_ENV !== 'production' && !existsSync(vectorizationDir)) {
+      await mkdir(vectorizationDir, { recursive: true });
+    }
+
+    const formData = await request.formData();
+    const file = formData.get('file') as File | null;
+    const originalFilename = formData.get('originalFilename') as string | null;
+
+    if (!file) {
+      return NextResponse.json(
+        { message: '没有找到文件' },
+        { status: 400 }
+      );
+    }
+
+    if (!originalFilename) {
+      return NextResponse.json(
+        { message: '缺少原始文件名' },
+        { status: 400 }
+      );
+    }
+
+    // 检查文件类型
+    const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+    if (!allowedTypes.includes(file.type)) {
+      return NextResponse.json(
+        { message: '不支持的文件类型，仅支持PDF、DOCX和TXT格式' },
+        { status: 400 }
+      );
+    }
+
+    // 检查文件大小 (限制为10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json(
+        { message: '文件大小超过限制（10MB）' },
+        { status: 400 }
+      );
+    }
+
+    // 直接处理文件内容，不保存到磁盘
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+    
+    // 为本地开发环境保存文件，替换旧文件
+    let filepath = '';
+    if (process.env.NODE_ENV !== 'production') {
+      // 删除同名的旧文件
+      const uploadDir = path.join(process.cwd(), 'uploads');
+      const uploadedFiles = await readdir(uploadDir);
+      
+      for (const existingFile of uploadedFiles) {
+        const existingOriginalName = existingFile.replace(/^\d+-/, '');
+        if (existingOriginalName === originalFilename) {
+          const existingFilePath = path.join(uploadDir, existingFile);
+          await unlink(existingFilePath);
+        }
+      }
+      
+      const filename = `${Date.now()}-${file.name}`;
+      filepath = path.join(process.cwd(), 'uploads', filename);
+      await writeFile(filepath, buffer);
+    }
+
+    // 解析文档内容
+    let text = '';
+    if (process.env.NODE_ENV === 'production') {
+      // 在生产环境中直接处理 buffer
+      text = await parseDocument(buffer, file.type);
+    } else {
+      // 在开发环境中处理文件路径
+      text = await parseDocument(filepath, file.type);
+    }
+    
+    // 文本分片
+    const texts = await splitText(text, 1000, 200);
+    
+    // 查找并删除旧的向量化数据
+    const vectorFiles = await readdir(vectorizationDir);
+    let existingSessionId = null;
+    
+    for (const vectorFile of vectorFiles) {
+      if (!vectorFile.endsWith('.json')) continue;
+      
+      try {
+        const vectorFilePath = path.join(vectorizationDir, vectorFile);
+        const fileContent = await readFile(vectorFilePath, 'utf-8');
+        const vectorData = JSON.parse(fileContent);
+        
+        // 如果向量化文件关联的是要更新的文件
+        if (vectorData.filename === originalFilename) {
+          // 保存现有sessionId以便重用
+          existingSessionId = vectorData.sessionId;
+          await unlink(vectorFilePath);
+        }
+      } catch (error) {
+        console.error(`解析向量化文件 ${vectorFile} 失败:`, error);
+        // 继续处理其他文件
+      }
+    }
+    
+    // 如果没有现有的sessionId，则生成新的
+    const sessionId = existingSessionId || `session-${Date.now()}`;
+    
+    // 读取现有会话数据
+    const sessions = await readSessionsFromFile();
+    
+    // 如果有现有的会话数据，先删除它
+    if (existingSessionId && sessions[existingSessionId]) {
+      delete sessions[existingSessionId];
+    }
+    
+    // 更新会话数据
+    sessions[sessionId] = {
+      filename: file.name,
+      createdAt: new Date().toISOString()
+    };
+    
+    // 写入会话数据到文件
+    await writeSessionsToFile(sessions);
+
+    // 将向量化数据存储到vectorization目录，仅在非生产环境中执行
+    if (process.env.NODE_ENV !== 'production') {
+      const vectorData = {
+        sessionId,
+        filename: file.name,
+        originalText: text, // 保存解析后的纯文本，而不是原始二进制内容
+        chunks: texts,
+        createdAt: new Date().toISOString()
+      };
+      
+      // 使用格式: {sessionId}.json 以便于会话恢复
+      const vectorFilename = `${sessionId}.json`;
+      const vectorFilePath = path.join(vectorizationDir, vectorFilename);
+      await writeFile(vectorFilePath, JSON.stringify(vectorData, null, 2));
+    }
+
+    return NextResponse.json(
+      { 
+        message: '简历更新成功',
+        sessionId: sessionId,
+        chunks: texts.length
+      },
+      { status: 200 }
+    );
+  } catch (error: any) {
+    console.error('简历更新错误:', error);
+    return NextResponse.json(
+      { message: '简历更新失败', error: error.message || '未知错误' },
       { status: 500 }
     );
   }

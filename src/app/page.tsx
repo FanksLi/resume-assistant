@@ -1,15 +1,18 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import FileUploader from './components/FileUploader';
-import FileList from './components/FileList';
-import ChatInterface from './components/ChatInterface';
-import FilePreview from './components/FilePreview';
+import { useState, useEffect, useRef } from "react";
+import FileUploader from "./components/FileUploader";
+import FileList from "./components/FileList";
+import ChatInterface from "./components/ChatInterface";
+import FilePreview from "./components/FilePreview";
+
+// 检查是否为生产环境
+const isProduction = process.env.NODE_ENV === "production";
 
 type Message = {
   id: string;
   content: string;
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
 };
 
 type UploadedFile = {
@@ -23,44 +26,51 @@ type UploadedFile = {
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState('');
+  const [uploadStatus, setUploadStatus] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [selectedFilename, setSelectedFilename] = useState<string | null>(null);
-  const [previewData, setPreviewData] = useState<{name: string, content: string} | null>(null);
+  const [previewData, setPreviewData] = useState<{
+    name: string;
+    content: string;
+  } | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const currentMessageRef = useState('');
+  const currentMessageRef = useRef("");
 
   // 获取文件列表
   useEffect(() => {
     const fetchFiles = async () => {
       try {
-        const response = await fetch('/api/files');
+        const response = await fetch("/api/files");
         const data = await response.json();
         if (response.ok) {
           setUploadedFiles(data.files);
           // 如果没有选中的文件，但有文件列表，默认选中第一个可用文件
           if (!selectedFilename && data.files.length > 0) {
-            const firstAvailableFile = data.files.find((file: UploadedFile) => file.sessionExists);
+            const firstAvailableFile = data.files.find(
+              (file: UploadedFile) => file.sessionExists
+            );
             if (firstAvailableFile) {
               setSelectedFilename(firstAvailableFile.name);
               setSessionId(firstAvailableFile.sessionId);
               // 加载欢迎消息
-              setMessages([{
-                id: Date.now().toString(),
-                content: `您好！我是您的AI简历助手。已切换到简历"${firstAvailableFile.name}"，您可以开始提问了。`,
-                role: 'assistant'
-              }]);
+              setMessages([
+                {
+                  id: Date.now().toString(),
+                  content: `您好！我是您的AI简历助手。已切换到简历"${firstAvailableFile.name}"，您可以开始提问了。`,
+                  role: "assistant",
+                },
+              ]);
             }
           }
         }
       } catch (error) {
-        console.error('获取文件列表失败:', error);
+        console.error("获取文件列表失败:", error);
       }
     };
 
@@ -70,35 +80,35 @@ export default function Home() {
   // 刷新文件列表的函数
   const refreshFileList = async () => {
     try {
-      const response = await fetch('/api/files');
+      const response = await fetch("/api/files");
       const data = await response.json();
       if (response.ok) {
         setUploadedFiles(data.files);
       }
     } catch (error) {
-      console.error('刷新文件列表失败:', error);
+      console.error("刷新文件列表失败:", error);
     }
   };
 
   const handleUpload = async () => {
     if (!file) {
-      alert('请选择一个文件');
+      alert("请选择一个文件");
       return;
     }
 
     // 检查文件数量限制
     if (uploadedFiles.length >= 5) {
-      alert('最多只能上传5个文件');
+      alert("最多只能上传5个文件");
       return;
     }
 
     setIsUploading(true);
-    setUploadStatus('正在上传文件...');
+    setUploadStatus("正在上传文件...");
     setUploadProgress(0);
 
     // 模拟进度条增长
     const progressInterval = setInterval(() => {
-      setUploadProgress(prev => {
+      setUploadProgress((prev) => {
         if (prev >= 90) {
           clearInterval(progressInterval);
           return prev;
@@ -107,122 +117,173 @@ export default function Home() {
       });
     }, 200);
 
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
-      const response = await fetch('/api/upload', {
-        method: 'POST',
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
         body: formData,
       });
 
-      // 确保进度条完成
+      const data = await response.json();
       clearInterval(progressInterval);
       setUploadProgress(100);
 
-      const result = await response.json();
-      
       if (response.ok) {
-        setUploadStatus('简历处理成功！');
-        // 保留当前会话，支持连续添加文件
-        setMessages(prev => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            content: `新简历"${file.name}"已成功添加到您的文件列表中。`,
-            role: 'assistant'
-          }
-        ]);
-        // 清除当前选择的文件，允许用户选择新文件
-        setFile(null);
-        // 刷新文件列表
-        refreshFileList();
+        setUploadStatus(data.message);
+        setSessionId(data.sessionId);
+        setTimeout(() => {
+          setFile(null);
+          setUploadStatus("");
+          setUploadProgress(0);
+          refreshFileList();
+        }, 2000);
       } else {
-        setUploadStatus(`上传失败: ${result.message}`);
+        setUploadStatus(data.message || "上传失败");
+        setIsUploading(false);
       }
-    } catch (error: any) {
+    } catch (error) {
       clearInterval(progressInterval);
-      setUploadStatus(`上传出错: ${error.message || '未知错误'}`);
-    } finally {
+      setUploadProgress(100);
+      setUploadStatus("上传过程中发生错误");
+      console.error("上传错误:", error);
       setIsUploading(false);
-      setTimeout(() => {
-        setUploadProgress(0);
-      }, 2000);
     }
   };
 
-  const handleDeleteFile = async (filename: string) => {
-    try {
-      setIsLoading(true);
-      setUploadStatus(`正在删除文件: ${filename}...`);
+  // 处理文件更新
+  const handleUpdateFile = async (originalFilename: string, newFile: File) => {
+    setIsUploading(true);
+    setUploadStatus("正在更新文件...");
+    setUploadProgress(0);
 
-      const response = await fetch('/api/files', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ filename }),
+    // 模拟进度条增长
+    const progressInterval = setInterval(() => {
+      setUploadProgress((prev) => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return prev;
+        }
+        return prev + 10;
+      });
+    }, 200);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", newFile);
+      formData.append("originalFilename", originalFilename);
+
+      const response = await fetch("/api/files", {
+        method: "PUT",
+        body: formData,
       });
 
-      const result = await response.json();
+      const data = await response.json();
+      clearInterval(progressInterval);
+      setUploadProgress(100);
 
       if (response.ok) {
-        setUploadStatus(`文件"${filename}"已成功删除`);
-        
-        // 如果删除的是当前选中的文件，清除会话
-        if (selectedFilename === filename) {
-          setSessionId(null);
-          setSelectedFilename(null);
-          setMessages([]);
+        setUploadStatus(data.message);
+        // 更新当前会话ID（如果更新的是当前选中的文件）
+        if (selectedFilename === originalFilename) {
+          setSessionId(data.sessionId);
+          // 刷新消息，显示新文件已更新
+          setMessages([
+            {
+              id: Date.now().toString(),
+              content: `简历"${originalFilename}"已更新成功！您现在可以基于更新后的简历内容进行提问了。`,
+              role: "assistant",
+            },
+          ]);
         }
-        
-        // 刷新文件列表
-        refreshFileList();
+        setTimeout(() => {
+          setUploadStatus("");
+          setUploadProgress(0);
+          refreshFileList();
+        }, 2000);
       } else {
-        setUploadStatus(`删除失败: ${result.message}`);
+        setUploadStatus(data.message || "更新失败");
+        setIsUploading(false);
       }
-    } catch (error: any) {
-      setUploadStatus(`删除文件出错: ${error.message || '未知错误'}`);
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      setUploadStatus("更新过程中发生错误");
+      console.error("更新错误:", error);
+      setIsUploading(false);
     }
   };
 
   const handleSwitchFile = async (filename: string) => {
     try {
-      setIsLoading(true);
-      setUploadStatus(`正在切换到文件: ${filename}...`);
-
-      const response = await fetch('/api/files', {
-        method: 'POST',
+      const response = await fetch("/api/files", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ filename }),
       });
 
-      const result = await response.json();
+      const data = await response.json();
 
-      if (response.ok && !result.requiresReprocessing) {
-        setSessionId(result.sessionId);
-        setSelectedFilename(filename);
-        setUploadStatus(`已切换到文件: ${filename}`);
-        
-        // 加载欢迎消息
-        setMessages([{
-          id: Date.now().toString(),
-          content: `您好！我是您的AI简历助手。已切换到简历"${filename}"，您可以开始提问了。`,
-          role: 'assistant'
-        }]);
-      } else if (result.requiresReprocessing) {
-        setUploadStatus(`文件"${filename}"需要重新处理，请重新上传。`);
+      if (response.ok) {
+        if (data.requiresReprocessing) {
+          setUploadStatus(`文件"${filename}"需要重新处理`);
+          setSelectedFilename(filename);
+          setSessionId(null);
+          setMessages([]);
+        } else {
+          setSelectedFilename(filename);
+          setSessionId(data.sessionId);
+          setUploadStatus("");
+
+          // 更新消息，显示已切换到新文件
+          setMessages([
+            {
+              id: Date.now().toString(),
+              content: `您好！我是您的AI简历助手。已切换到简历"${filename}"，您可以开始提问了。`,
+              role: "assistant",
+            },
+          ]);
+        }
       } else {
-        setUploadStatus(`切换失败: ${result.message}`);
+        alert(data.message || "切换文件失败");
       }
-    } catch (error: any) {
-      setUploadStatus(`切换文件出错: ${error.message || '未知错误'}`);
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      console.error("切换文件错误:", error);
+      alert("切换文件时发生错误");
+    }
+  };
+
+  const handleDeleteFile = async (filename: string) => {
+    try {
+      const response = await fetch("/api/files", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ filename }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // 如果删除的是当前选中的文件，清除会话
+        if (selectedFilename === filename) {
+          setSelectedFilename(null);
+          setSessionId(null);
+          setMessages([]);
+        }
+
+        refreshFileList();
+        alert(data.message);
+      } else {
+        alert(data.message || "删除文件失败");
+      }
+    } catch (error) {
+      console.error("删除文件错误:", error);
+      alert("删除文件时发生错误");
     }
   };
 
@@ -230,58 +291,70 @@ export default function Home() {
     setIsPreviewLoading(true);
     setIsPreviewOpen(true);
     setPreviewData(null);
-    
+
     try {
-      // 从上传目录获取文件内容
-      const response = await fetch(`/api/files?preview=${encodeURIComponent(filename)}`);
-      const result = await response.json();
-      
+      const response = await fetch(
+        `/api/files?preview=${encodeURIComponent(filename)}`
+      );
+      const data = await response.json();
+
       if (response.ok) {
         setPreviewData({
           name: filename,
-          content: result.content
+          content: data.content,
         });
       } else {
-        console.error('预览文件失败:', result.message);
+        alert(data.message || "预览文件失败");
+        setIsPreviewOpen(false);
       }
     } catch (error) {
-      console.error('预览文件出错:', error);
+      console.error("预览文件错误:", error);
+      alert("预览文件时发生错误");
+      setIsPreviewOpen(false);
     } finally {
       setIsPreviewLoading(false);
     }
   };
 
-  const handleClosePreview = () => {
-    setIsPreviewOpen(false);
-    setPreviewData(null);
+  const handleClearSession = () => {
+    setSessionId(null);
+    setSelectedFilename(null);
+    setMessages([]);
   };
 
-  const handleSendMessage = async () => {
-    if (!inputValue.trim() || !sessionId || isLoading) return;
+  const handleFileChange = (selectedFile: File) => {
+    setFile(selectedFile);
+  };
 
-    // 添加用户消息
+  const handleSendMessage = async (question?: string) => {
+    const value = question || inputValue;
+    if (!value.trim() || !sessionId || isLoading) return;
+
     const userMessage: Message = {
       id: Date.now().toString(),
-      content: inputValue,
-      role: 'user'
+      content: value,
+      role: "user",
     };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputValue('');
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
+    setInputValue("");
     setIsLoading(true);
-    // currentMessageRef.current = '';
+    currentMessageRef.current = "";
 
     try {
-      // 使用SSE流式处理
-      const response = await fetch('/api/chat', {
-        method: 'POST',
+      // 创建一个新的助手消息用于流式更新
+      const assistantMessageId = (Date.now() + 1).toString();
+
+      // 发起流式请求
+      const response = await fetch("/api/chat", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          question: inputValue,
-          sessionId,
-          stream: true
+          message: value,
+          sessionId: sessionId,
+          stream: true, // 启用流式传输
         }),
       });
 
@@ -290,126 +363,91 @@ export default function Home() {
       }
 
       if (!response.body) {
-        throw new Error('响应体为空');
+        throw new Error("响应体为空");
       }
 
       const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      
-      // 添加初始助手消息
-      const assistantMessageId = Date.now().toString();
-      setMessages(prev => [...prev, {
-        id: assistantMessageId,
-        content: '',
-        role: 'assistant'
-      }]);
+      const decoder = new TextDecoder("utf-8");
 
-      let accumulatedContent = '';
-      
+      // 创建初始的助手消息
+      const assistantMessage: Message = {
+        id: assistantMessageId,
+        content: "",
+        role: "assistant",
+      };
+
+      setMessages([...newMessages, assistantMessage]);
+
+      // 逐步读取流式响应
       while (true) {
         const { done, value } = await reader.read();
-        
-        if (done) {
-          break;
-        }
+        if (done) break;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n\n');
-        
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n\n");
+
         for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          
-          const data = line.slice(6); // 移除 'data: ' 前缀
-          
-          if (data === '[DONE]') {
-            // 流结束
-            continue;
-          }
-          
-          try {
-            const parsed = JSON.parse(data);
-            
-            if (parsed.content) {
-              accumulatedContent += parsed.content;
-              // 更新助手消息
-              setMessages(prev => prev.map(msg => 
-                msg.id === assistantMessageId 
-                  ? { ...msg, content: accumulatedContent } 
-                  : msg
-              ));
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6);
+
+            if (data === "[DONE]") {
+              // 流完成，退出循环
+              break;
             }
-          } catch (e) {
-            console.error('解析SSE数据失败:', e);
+
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.content) {
+                currentMessageRef.current += parsed.content;
+
+                // 更新消息列表中的助手消息
+                setMessages((prevMessages) => {
+                  const updatedMessages = [...prevMessages];
+                  const lastMessage =
+                    updatedMessages[updatedMessages.length - 1];
+
+                  if (lastMessage.id === assistantMessageId) {
+                    lastMessage.content = currentMessageRef.current;
+                  }
+
+                  return updatedMessages;
+                });
+              }
+            } catch (parseError) {
+              console.error("解析流数据错误:", parseError);
+            }
           }
         }
       }
-    } catch (error: any) {
-      // 添加错误消息
+    } catch (error) {
+      console.error("发送消息错误:", error);
       const errorMessage: Message = {
-        id: Date.now().toString(),
-        content: `网络错误: ${error.message || '未知错误'}`,
-        role: 'assistant'
+        id: (Date.now() + 2).toString(),
+        content: "抱歉，我无法处理您的请求。请稍后重试。",
+        role: "assistant",
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages((prevMessages) => [...prevMessages, errorMessage]);
     } finally {
       setIsLoading(false);
-      // currentMessageRef.current = '';
-    }
-  };
-
-  const handleClearSession = async () => {
-    if (!sessionId) return;
-
-    try {
-      const response = await fetch('/api/session', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ sessionId }),
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        setSessionId(null);
-        setMessages([]);
-        setFile(null);
-        setUploadStatus('');
-        setSelectedFilename(null);
-      } else {
-        alert(`清除会话失败: ${result.message}`);
-      }
-    } catch (error: any) {
-      alert(`清除会话出错: ${error.message || '未知错误'}`);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="bg-white border-b border-gray-200">
-        <div className="container mx-auto px-4">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center">
-              <div className="bg-gradient-to-r from-blue-500 to-purple-600 w-8 h-8 rounded-lg flex items-center justify-center">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-              </div>
-              <h1 className="ml-3 text-xl font-semibold text-gray-900">AI简历助手</h1>
-            </div>
-            <div className="text-sm text-gray-500 hidden sm:block">
-              基于AI的智能简历分析工具
-            </div>
-          </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 sm:text-4xl">
+            AI简历助手
+          </h1>
+          <p className="mt-3 text-lg text-gray-500">
+            智能简历优化工具，助您打造专业简历
+          </p>
         </div>
-      </header>
 
-      <main className="flex-1 container mx-auto px-4 py-6 flex flex-col">
-        <div className="flex-1 flex flex-col lg:flex-row gap-6">
-          {/* 左侧：上传区域和文件列表 */}
-          <div className="lg:w-1/3">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-full flex flex-col">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* 左侧文件上传和文件列表区域 */}
+          <div className="lg:col-span-1 bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-fit">
+            {!isProduction && (
               <FileUploader
                 file={file}
                 sessionId={sessionId}
@@ -422,19 +460,25 @@ export default function Home() {
                 onUpload={handleUpload}
                 onClearSession={handleClearSession}
               />
-              
-              <FileList
-                uploadedFiles={uploadedFiles}
-                selectedFilename={selectedFilename}
-                onSwitchFile={handleSwitchFile}
-                onPreviewFile={handlePreviewFile}
-                onDeleteFile={handleDeleteFile}
-              />
-            </div>
+            )}
+
+            <FileList
+              uploadedFiles={uploadedFiles}
+              selectedFilename={selectedFilename}
+              onSwitchFile={handleSwitchFile}
+              onPreviewFile={handlePreviewFile}
+              onDeleteFile={handleDeleteFile}
+              onUpdateFile={handleUpdateFile}
+              isProduction={isProduction}
+            />
           </div>
 
-          {/* 右侧：聊天区域 */}
-          <div className="lg:w-2/3">
+          {/* 右侧聊天区域 */}
+          <div
+            className={`${
+              "lg:col-span-2"
+            } flex flex-col`}
+          >
             <ChatInterface
               sessionId={sessionId}
               messages={messages}
@@ -445,21 +489,15 @@ export default function Home() {
             />
           </div>
         </div>
-      </main>
 
-      <FilePreview
-        filename={previewData?.name || null}
-        content={previewData?.content || null}
-        isLoading={isPreviewLoading}
-        isOpen={isPreviewOpen}
-        onClose={handleClosePreview}
-      />
-
-      <footer className="bg-white border-t border-gray-200 py-4">
-        <div className="container mx-auto px-4 text-center text-sm text-gray-500">
-          © {new Date().getFullYear()} AI简历助手 - 基于Next.js和Langchain构建
-        </div>
-      </footer>
+        <FilePreview
+          isOpen={isPreviewOpen}
+          isLoading={isPreviewLoading}
+          filename={previewData?.name || null}
+          content={previewData?.content || null}
+          onClose={() => setIsPreviewOpen(false)}
+        />
+      </div>
     </div>
   );
 }

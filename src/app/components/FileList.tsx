@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+
 
 type UploadedFile = {
   name: string;
@@ -16,6 +17,8 @@ interface FileListProps {
   onSwitchFile: (filename: string) => void;
   onPreviewFile: (filename: string) => void;
   onDeleteFile: (filename: string) => void;
+  onUpdateFile: (filename: string, file: File) => void; // 添加更新文件的回调函数
+  isProduction: boolean;
 }
 
 export default function FileList({
@@ -23,9 +26,13 @@ export default function FileList({
   selectedFilename,
   onSwitchFile,
   onPreviewFile,
-  onDeleteFile
+  onDeleteFile,
+  onUpdateFile,
+  isProduction,
 }: FileListProps) {
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
+  const [fileToUpdate, setFileToUpdate] = useState<string | null>(null); // 要更新的文件
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const confirmDelete = (filename: string) => {
     setFileToDelete(filename);
@@ -35,6 +42,20 @@ export default function FileList({
     if (fileToDelete) {
       onDeleteFile(fileToDelete);
       setFileToDelete(null);
+    }
+  };
+
+  // 触发文件选择对话框
+  const triggerFileUpdate = (filename: string) => {
+    setFileToUpdate(filename);
+    fileInputRef.current?.click();
+  };
+
+  // 处理文件更新
+  const handleFileUpdate = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0] && fileToUpdate) {
+      onUpdateFile(fileToUpdate, e.target.files[0]);
+      setFileToUpdate(null);
     }
   };
 
@@ -54,6 +75,15 @@ export default function FileList({
                 }`}
                 onClick={() => onSwitchFile(uploadedFile.name)}
               >
+                {/* 隐藏的文件输入框，用于更新文件 */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  onChange={handleFileUpdate}
+                  accept=".pdf,.docx,.txt"
+                />
+                
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
@@ -98,36 +128,52 @@ export default function FileList({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
                       </svg>
                     </button>
-                    {uploadedFile.sessionExists && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSwitchFile(uploadedFile.name);
-                        }}
-                        className={`${
-                          selectedFilename === uploadedFile.name 
-                            ? 'text-blue-500' 
-                            : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                        title="切换到此文件"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                        </svg>
-                      </button>
+                    {!isProduction && (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            triggerFileUpdate(uploadedFile.name);
+                          }}
+                          className="text-gray-500 hover:text-blue-500"
+                          title="更新文件"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                          </svg>
+                        </button>
+                        {uploadedFile.sessionExists && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSwitchFile(uploadedFile.name);
+                            }}
+                            className={`${
+                              selectedFilename === uploadedFile.name 
+                                ? 'text-blue-500' 
+                                : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                            title="切换到此文件"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                          </button>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            confirmDelete(uploadedFile.name);
+                          }}
+                          className="text-gray-500 hover:text-red-500"
+                          title="删除文件"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                          </svg>
+                        </button>
+                      </>
                     )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        confirmDelete(uploadedFile.name);
-                      }}
-                      className="text-gray-500 hover:text-red-500"
-                      title="删除文件"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                      </svg>
-                    </button>
                   </div>
                 </div>
               </div>
@@ -158,6 +204,12 @@ export default function FileList({
               </svg>
               <span>绿色标记文件可直接使用，无需重复处理</span>
             </li>
+            <li className="flex items-start">
+              <svg className="w-4 h-4 text-blue-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
+              </svg>
+              <span>红色标记文件需要先处理才能使用</span>
+            </li>
           </ul>
         </div>
       </div>
@@ -165,21 +217,21 @@ export default function FileList({
       {/* 删除确认弹窗 */}
       {fileToDelete && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96 max-w-90vw">
-            <h3 className="text-lg font-medium text-gray-900 mb-2">确认删除</h3>
-            <p className="text-gray-600 mb-4">
-              确定要删除文件 <span className="font-medium">{fileToDelete}</span> 吗？此操作不可撤销。
+          <div className="bg-white rounded-lg p-6 w-96">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">确认删除</h3>
+            <p className="text-gray-500 mb-6">
+              确定要删除文件 "{fileToDelete}" 吗？此操作不可撤销。
             </p>
             <div className="flex justify-end space-x-3">
               <button
                 onClick={() => setFileToDelete(null)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
               >
                 取消
               </button>
               <button
                 onClick={handleDelete}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
               >
                 确认删除
               </button>

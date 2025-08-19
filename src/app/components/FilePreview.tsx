@@ -36,19 +36,15 @@ export default function FilePreview({
             <div className="flex justify-center items-center h-32">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
             </div>
-          ) : (
+          ) : content ? (
             <pre className="whitespace-pre-wrap text-sm text-gray-700">
               {content}
             </pre>
+          ) : (
+            <div className="flex justify-center items-center h-32 text-gray-500">
+              无法加载文件内容
+            </div>
           )}
-        </div>
-        <div className="border-t border-gray-200 px-6 py-4">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-          >
-            关闭
-          </button>
         </div>
       </div>
     </div>

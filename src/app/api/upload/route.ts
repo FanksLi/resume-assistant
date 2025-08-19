@@ -17,9 +17,9 @@ export async function POST(request: Request) {
       }
     }
 
-    // 确保vectorization目录存在
+    // 确保vectorization目录存在，仅在非生产环境中创建
     const vectorizationDir = path.join(process.cwd(), 'vectorization');
-    if (!existsSync(vectorizationDir)) {
+    if (process.env.NODE_ENV !== 'production' && !existsSync(vectorizationDir)) {
       await mkdir(vectorizationDir, { recursive: true });
     }
 
@@ -93,19 +93,21 @@ export async function POST(request: Request) {
     // 写入会话数据到文件
     await writeSessionsToFile(sessions);
 
-    // 将向量化数据存储到vectorization目录，使用更易查找的命名方式
-    const vectorData = {
-      sessionId,
-      filename: file.name,
-      originalText: text, // 保存解析后的纯文本，而不是原始二进制内容
-      chunks: texts,
-      createdAt: new Date().toISOString()
-    };
-    
-    // 使用格式: {sessionId}.json 以便于会话恢复
-    const vectorFilename = `${sessionId}.json`;
-    const vectorFilePath = path.join(vectorizationDir, vectorFilename);
-    await writeFile(vectorFilePath, JSON.stringify(vectorData, null, 2));
+    // 将向量化数据存储到vectorization目录，仅在非生产环境中执行
+    if (process.env.NODE_ENV !== 'production') {
+      const vectorData = {
+        sessionId,
+        filename: file.name,
+        originalText: text, // 保存解析后的纯文本，而不是原始二进制内容
+        chunks: texts,
+        createdAt: new Date().toISOString()
+      };
+      
+      // 使用格式: {sessionId}.json 以便于会话恢复
+      const vectorFilename = `${sessionId}.json`;
+      const vectorFilePath = path.join(vectorizationDir, vectorFilename);
+      await writeFile(vectorFilePath, JSON.stringify(vectorData, null, 2));
+    }
 
     return NextResponse.json(
       { 

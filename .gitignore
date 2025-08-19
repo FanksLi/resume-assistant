@@ -50,9 +50,7 @@ coverage/
 .DS_Store
 Thumbs.db
 
-# Uploads and vectorization data
-uploads/
-vectorization/
+
 
 # Session data
 sessions.json

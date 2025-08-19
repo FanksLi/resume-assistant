@@ -12,15 +12,17 @@ import { readSessionsFromFile } from '@/app/lib/sessionManager';
 
 export async function POST(request: Request) {
   try {
-    const { question, sessionId, stream = false } = await request.json();
+    const { message, sessionId, stream = false } = await request.json();
 
-    if (!question) {
+    // 检查消息参数（修复参数名称）
+    if (!message) {
       return NextResponse.json(
-        { message: '问题不能为空' },
+        { message: '消息不能为空' },
         { status: 400 }
       );
     }
 
+    // 检查会话ID参数
     if (!sessionId) {
       return NextResponse.json(
         { message: '会话ID不能为空' },
@@ -30,11 +32,11 @@ export async function POST(request: Request) {
 
     // 检查会话是否存在
     let sessionData = null;
-    
-    // 从本地文件中读取会话数据
+
+    // 仅在非生产环境中从本地文件中读取会话数据
     const sessions = await readSessionsFromFile();
     const sessionInfo = sessions[sessionId];
-    
+
     if (sessionInfo) {
       // 如果会话存在，尝试从向量化文件中恢复向量存储
       const vectorizationDir = path.join(process.cwd(), 'vectorization');
@@ -43,15 +45,15 @@ export async function POST(request: Request) {
           // 查找对应的向量化文件
           const vectorFilename = `${sessionId}.json`;
           const vectorFilePath = path.join(vectorizationDir, vectorFilename);
-          
+
           if (existsSync(vectorFilePath)) {
             // 读取向量化数据
             const fileContent = await readFile(vectorFilePath, 'utf8');
             const vectorData = JSON.parse(fileContent);
-            
+
             // 重新创建向量存储
             const vectorStore = await createVectorStore(vectorData.chunks);
-            
+
             // 重建会话数据
             sessionData = {
               vectorStore,
@@ -64,7 +66,7 @@ export async function POST(request: Request) {
         }
       }
     }
-    
+
     // 再次检查会话是否存在
     if (!sessionData) {
       return NextResponse.json(
@@ -76,8 +78,8 @@ export async function POST(request: Request) {
     const { vectorStore } = sessionData;
 
     // 搜索相关文档
-    const relatedDocs = await searchSimilarDocuments(vectorStore, question, 4);
-    
+    const relatedDocs = await searchSimilarDocuments(vectorStore, message, 4);
+
     // 构建上下文
     const context = relatedDocs.map(doc => doc.pageContent).join('\n\n');
 
@@ -86,8 +88,8 @@ export async function POST(request: Request) {
     if (!deepSeekApiKey) {
       // 如果没有配置API密钥，则返回基于检索内容的简单回答
       return NextResponse.json(
-        { 
-          answer: `根据您的简历内容，我找到了以下相关信息：\n\n${context}\n\n请注意：由于系统未配置AI模型API密钥，我无法生成智能回答。请配置DEEPSEEK_API_KEY环境变量以启用完整功能。`,
+        {
+          reply: `根据您的简历内容，我找到了以下相关信息：\n\n${context}\n\n请注意：由于系统未配置AI模型API密钥，我无法生成智能回答。请配置DEEPSEEK_API_KEY环境变量以启用完整功能。`,
           sources: relatedDocs.map(doc => ({
             content: doc.pageContent,
             metadata: doc.metadata
@@ -135,8 +137,8 @@ export async function POST(request: Request) {
 
     if (stream) {
       // 流式响应
-      const streamResponse = await chain.stream({ question });
-      
+      const streamResponse = await chain.stream({ question: message });
+
       // 创建ReadableStream
       const readableStream = new ReadableStream({
         async start(controller) {
@@ -162,11 +164,11 @@ export async function POST(request: Request) {
       });
     } else {
       // 生成回答
-      const answer = await chain.invoke({ question });
+      const reply = await chain.invoke({ question: message });
 
       return NextResponse.json(
-        { 
-          answer,
+        {
+          reply,
           sources: relatedDocs.map(doc => ({
             content: doc.pageContent,
             metadata: doc.metadata

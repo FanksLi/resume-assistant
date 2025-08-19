@@ -15,8 +15,16 @@ interface ChatInterfaceProps {
   inputValue: string;
   isLoading: boolean;
   onInputChange: (value: string) => void;
-  onSendMessage: () => void;
+  onSendMessage: (inputValue?: string | undefined) => void;
 }
+
+const SUGGESTED_QUESTIONS = [
+  "介绍一下你自己",
+  "你有哪些优势",
+  "如何优化我的工作经历描述",
+  "简历中应该包含哪些关键技能",
+  "如何让我的简历更突出"
+];
 
 export default function ChatInterface({
   sessionId,
@@ -38,6 +46,12 @@ export default function ChatInterface({
       e.preventDefault();
       onSendMessage();
     }
+  };
+
+  const handleSuggestedQuestionClick = (question: string) => {
+    onInputChange(question);
+    // 直接调用发送消息函数，确保状态更新后再执行
+    onSendMessage(question)
   };
 
   return (
@@ -89,6 +103,24 @@ export default function ChatInterface({
             <div ref={messagesEndRef} />
           </div>
           
+          {/* 当没有消息时显示建议问题 */}
+          {messages.length <= 1 && !isLoading && (
+            <div className="mb-4">
+              <p className="text-gray-500 text-sm mb-2">您可以尝试问：</p>
+              <div className="flex flex-wrap gap-2">
+                {SUGGESTED_QUESTIONS.map((question, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleSuggestedQuestionClick(question)}
+                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs px-3 py-1.5 rounded-full transition-colors"
+                  >
+                    {question}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          
           <div className="mt-auto pt-4 border-t border-gray-200">
             <div className="flex">
               <textarea
@@ -101,7 +133,7 @@ export default function ChatInterface({
                 disabled={isLoading}
               />
               <button
-                onClick={onSendMessage}
+                onClick={() => onSendMessage()}
                 disabled={isLoading || !inputValue.trim()}
                 className={`ml-2 px-4 rounded-lg text-sm font-medium flex items-center ${
                   isLoading || !inputValue.trim()
