@@ -455,10 +455,12 @@ export async function PUT(request: Request) {
 // 删除文件
 export async function DELETE(request: Request) {
   try {
+    // 先读取请求体
+    const body = await request.json();
+    
     // 检查是否为生产环境，如果是则需要密码验证
     const isProduction = process.env.NODE_ENV === "production";
     if (isProduction) {
-      const body = await request.json();
       const { password } = body;
       
       // 验证密码
@@ -470,7 +472,6 @@ export async function DELETE(request: Request) {
       }
     }
     
-    const body = await request.json();
     const { filename } = body;
 
     if (!filename) {
