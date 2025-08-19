@@ -287,6 +287,21 @@ export async function POST(request: Request) {
 // 更新文件
 export async function PUT(request: Request) {
   try {
+    // 检查是否为生产环境，如果是则需要密码验证
+    const isProduction = process.env.NODE_ENV === "production";
+    if (isProduction) {
+      const formData = await request.formData();
+      const password = formData.get('password') as string | null;
+      
+      // 验证密码
+      if (!password || password !== "7878") {
+        return NextResponse.json(
+          { message: '密码错误' },
+          { status: 401 }
+        );
+      }
+    }
+    
     // 使用 /tmp 目录进行文件存储（Vercel 环境中唯一可写的目录）
     const uploadDir = path.join('/tmp', 'uploads');
     const vectorizationDir = path.join('/tmp', 'vectorization');
@@ -440,7 +455,23 @@ export async function PUT(request: Request) {
 // 删除文件
 export async function DELETE(request: Request) {
   try {
-    const { filename } = await request.json();
+    // 检查是否为生产环境，如果是则需要密码验证
+    const isProduction = process.env.NODE_ENV === "production";
+    if (isProduction) {
+      const body = await request.json();
+      const { password } = body;
+      
+      // 验证密码
+      if (!password || password !== "7878") {
+        return NextResponse.json(
+          { message: '密码错误' },
+          { status: 401 }
+        );
+      }
+    }
+    
+    const body = await request.json();
+    const { filename } = body;
 
     if (!filename) {
       return NextResponse.json(

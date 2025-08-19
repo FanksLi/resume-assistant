@@ -173,6 +173,12 @@ export default function Home() {
       const formData = new FormData();
       formData.append("file", newFile);
       formData.append("originalFilename", originalFilename);
+      
+      // 如果是生产环境，添加密码
+      if (isProduction) {
+        const password = "7878"; // 使用硬编码的密码
+        formData.append("password", password);
+      }
 
       const response = await fetch("/api/files", {
         method: "PUT",
@@ -258,12 +264,20 @@ export default function Home() {
 
   const handleDeleteFile = async (filename: string) => {
     try {
+      // 准备请求体
+      const requestBody: any = { filename };
+      
+      // 如果是生产环境，添加密码
+      if (isProduction) {
+        requestBody.password = "7878"; // 使用硬编码的密码
+      }
+
       const response = await fetch("/api/files", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ filename }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
