@@ -447,20 +447,18 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* 左侧文件上传和文件列表区域 */}
           <div className="lg:col-span-1 bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-fit">
-            {!isProduction && (
-              <FileUploader
-                file={file}
-                sessionId={sessionId}
-                isLoading={isLoading}
-                isUploading={isUploading}
-                uploadStatus={uploadStatus}
-                uploadProgress={uploadProgress}
-                uploadedFiles={uploadedFiles}
-                onFileChange={setFile}
-                onUpload={handleUpload}
-                onClearSession={handleClearSession}
-              />
-            )}
+            <FileUploader
+              file={file}
+              sessionId={sessionId}
+              isLoading={isLoading}
+              isUploading={isUploading}
+              uploadStatus={uploadStatus}
+              uploadProgress={uploadProgress}
+              uploadedFiles={uploadedFiles}
+              onFileChange={setFile}
+              onUpload={handleUpload}
+              onClearSession={handleClearSession}
+            />
 
             <FileList
               uploadedFiles={uploadedFiles}
@@ -474,11 +472,7 @@ export default function Home() {
           </div>
 
           {/* 右侧聊天区域 */}
-          <div
-            className={`${
-              "lg:col-span-2"
-            } flex flex-col`}
-          >
+          <div className={`${"lg:col-span-2"} flex flex-col`}>
             <ChatInterface
               sessionId={sessionId}
               messages={messages}
