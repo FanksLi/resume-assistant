@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { existsSync } from 'fs';
-import { readFile, writeFile, unlink } from 'fs/promises';
+import { unlink } from 'fs/promises';
 import path from 'path';
 import { readSessionsFromFile, writeSessionsToFile } from '@/app/lib/sessionManager';
 
