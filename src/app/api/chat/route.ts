@@ -32,6 +32,7 @@ export async function POST(request: Request) {
 
     // 检查会话是否存在
     let sessionData = null;
+    let vectorData: any = null;
 
     // 从本地文件中读取会话数据（现在所有环境都使用相同的方式）
     const sessions = await readSessionsFromFile();
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
           if (existsSync(vectorFilePath)) {
             // 读取向量化数据
             const fileContent = await readFile(vectorFilePath, 'utf8');
-            const vectorData = JSON.parse(fileContent);
+            vectorData = JSON.parse(fileContent);
 
             // 重新创建向量存储
             const vectorStore = await createVectorStore(vectorData.chunks);
@@ -77,11 +78,12 @@ export async function POST(request: Request) {
 
     const { vectorStore } = sessionData;
 
-    // 搜索相关文档
+    // 检索相关文档片段（用于返回来源引用）
     const relatedDocs = await searchSimilarDocuments(vectorStore, message, 4);
 
-    // 构建上下文
-    const context = relatedDocs.map(doc => doc.pageContent).join('\n\n');
+    // 小文档直接附上全文作为上下文，避免向量检索截断导致漏掉分散事实（如年龄、联系方式）
+    const fullText = vectorData.originalText || relatedDocs.map(doc => doc.pageContent).join('\n\n');
+    const context = fullText;
 
     // 检查是否配置了DeepSeek API密钥
     const deepSeekApiKey = process.env.DEEPSEEK_API_KEY;

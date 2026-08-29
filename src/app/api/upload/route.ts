@@ -40,10 +40,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // 检查文件大小 (限制为10MB)
-    if (file.size > 10 * 1024 * 1024) {
+    // 检查文件大小 (限制为5MB)
+    if (file.size > 5 * 1024 * 1024) {
       return NextResponse.json(
-        { message: '文件大小超过限制（10MB）' },
+        { message: '文件大小超过限制（5MB）' },
         { status: 400 }
       );
     }

@@ -56,11 +56,11 @@ export default function ChatInterface({
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-full flex flex-col">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">AI助手对话</h2>
-      
+      <h2 className="text-lg font-semibold text-gray-900 mb-4 shrink-0">AI助手对话</h2>
+
       {sessionId ? (
-        <div className="flex-1 flex flex-col">
-          <div className="flex-1 overflow-y-auto mb-4 space-y-4 max-h-96 lg:max-h-[calc(100vh-220px)]">
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0 overflow-y-auto mb-4 space-y-4">
             {messages.map((message) => (
               <div 
                 key={message.id} 

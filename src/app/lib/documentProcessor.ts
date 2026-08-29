@@ -1,4 +1,4 @@
-import pdfParse from 'pdf-parse';
+import { extractText } from 'unpdf';
 import { readFile } from 'fs/promises';
 import mammoth from 'mammoth';
 
@@ -10,11 +10,10 @@ import mammoth from 'mammoth';
 export async function parsePDF(filePath: string): Promise<string> {
   try {
     const buffer = await readFile(filePath);
-    const data = await pdfParse(buffer);
-    return data.text;
+    return await parsePDFBuffer(buffer);
   } catch (error) {
     console.error('PDF解析错误:', error);
-    throw new Error('PDF文件解析失败');
+    throw new Error(`PDF文件解析失败: ${error instanceof Error ? error.message : error}`);
   }
 }
 
@@ -25,11 +24,11 @@ export async function parsePDF(filePath: string): Promise<string> {
  */
 export async function parsePDFBuffer(buffer: Buffer): Promise<string> {
   try {
-    const data = await pdfParse(buffer);
-    return data.text;
+    const { text } = await extractText(new Uint8Array(buffer), { mergePages: true });
+    return text;
   } catch (error) {
     console.error('PDF解析错误:', error);
-    throw new Error('PDF文件解析失败');
+    throw new Error(`PDF文件解析失败: ${error instanceof Error ? error.message : error}`);
   }
 }
 
